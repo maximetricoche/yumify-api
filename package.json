@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "main.ts",
   "scripts": {
-    "dev": "tsx watch --clear-screen=false ./src/main"
+    "dev": "tsx watch --clear-screen=false ./src/main",
+    "db:migrate": "tsx ./src/databases/migrate"
   },
   "author": "",
   "license": "ISC",
