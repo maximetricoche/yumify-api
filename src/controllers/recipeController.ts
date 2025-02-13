@@ -75,4 +75,26 @@ const add: RequestHandler = async (req, res, next) => {
   }
 };
 
-export default { browse, read, edit, add };
+const destroy: RequestHandler = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      res.status(STATUS.BAD_REQUEST).json({ message: "Données manquantes" });
+      return;
+    }
+
+    const result = await recipeService.deleteRecipe(Number(id));
+
+    if (!result || result === 0) {
+      res.status(STATUS.NOT_FOUND).json({ message: "Recette introuvable" });
+      return;
+    }
+
+    res.status(STATUS.OK).json({ message: "Recette supprimée", result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export default { browse, read, edit, add, destroy };

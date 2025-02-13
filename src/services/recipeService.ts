@@ -82,4 +82,15 @@ const addSteps = async (recipeId: number, steps: { stepNumber: number; descripti
   }
 };
 
-export default { getAllRecipes, getRecipe, updateRecipe, addRecipe, addIngredients, addSteps };
+const deleteRecipe = async (recipeId: number) => {
+  try {
+    const result = await recipeModel.deleteRecipe(recipeId);
+
+    return result;
+  } catch (error) {
+    console.error("Erreur lors de la suppression de la recette", error);
+    throw error;
+  }
+};
+
+export default { getAllRecipes, getRecipe, updateRecipe, addRecipe, addIngredients, addSteps, deleteRecipe };
