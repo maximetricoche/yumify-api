@@ -26,7 +26,7 @@ const read: RequestHandler = async (req, res, next) => {
 
     const recipe = await recipeService.getRecipe(Number(id), Number(userId));
 
-    if (!recipe) {
+    if (!recipe || recipe.length === 0) {
       res.status(STATUS.NOT_FOUND).json({ message: "Recette introuvable" });
       return;
     }

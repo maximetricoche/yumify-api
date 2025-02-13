@@ -28,7 +28,7 @@ const readAll = async (userId: number) => {
     image: rows[0].file_path,
   };
 
-  return recipes;
+  return [recipes];
 };
 
 const read = async (recipeId: number, userId: number) => {
@@ -99,7 +99,7 @@ const read = async (recipeId: number, userId: number) => {
     });
   });
 
-  return recipe;
+  return [recipe];
 };
 
 export default { readAll, read };
