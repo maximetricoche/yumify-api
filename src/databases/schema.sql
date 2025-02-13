@@ -27,7 +27,8 @@ CREATE TABLE steps (
   step_number INT UNSIGNED NOT NULL,
   description TEXT NOT NULL,
   recipe_id INT UNSIGNED NOT NULL,
-  CONSTRAINT fk_recipe_step FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
+  CONSTRAINT fk_recipe_step FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE,
+  CONSTRAINT unique_step_number UNIQUE (step_number, recipe_id)
 );
 
 CREATE TABLE ingredients (
