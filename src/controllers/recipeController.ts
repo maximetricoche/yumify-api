@@ -36,4 +36,22 @@ const read: RequestHandler = async (req, res, next) => {
   }
 };
 
-export default { browse, read };
+const edit: RequestHandler = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { updatedData } = req.body;
+
+    if (!id || !updatedData) {
+      res.status(STATUS.BAD_REQUEST).json({ message: "Données manquantes" });
+      return;
+    }
+
+    const modifications = await recipeService.updateRecipe(Number(id), updatedData);
+
+    res.status(STATUS.OK).json({ message: "Mise à jour effectuée", modifications });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export default { browse, read, edit };
