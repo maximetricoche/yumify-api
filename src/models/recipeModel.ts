@@ -241,4 +241,15 @@ const addStepToRecipe = async (recipeId: number, stepNumber: number, description
   );
 };
 
-export default { readAll, read, updateRecipe, updateIngredients, updateSteps, createRecipe, insertIngrendientIfNoExists, getIngredientByName, addIngredientToRecipe, addStepToRecipe };
+const deleteRecipe = async (recipeId: number) => {
+  const [result] = await db.query<Result>(
+    `
+    DELETE FROM recipes
+    WHERE id = ?
+    `,
+    [recipeId],
+  );
+  return result.affectedRows;
+};
+
+export default { readAll, read, updateRecipe, updateIngredients, updateSteps, createRecipe, insertIngrendientIfNoExists, getIngredientByName, addIngredientToRecipe, addStepToRecipe, deleteRecipe };
