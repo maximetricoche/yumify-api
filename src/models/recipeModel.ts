@@ -173,4 +173,72 @@ const updateSteps = async (recipeId: number, updatedSteps: { stepNumber: number;
   }
 };
 
-export default { readAll, read, updateRecipe, updateIngredients, updateSteps };
+const createRecipe = async (newRecipe: { title: string; prepTime: number; cookTime: number; category: string; userId: number }) => {
+  const { title, prepTime, cookTime, category, userId } = newRecipe;
+
+  const [result] = await db.query<Result>(
+    `
+    INSERT INTO recipes (title, prep_time, cook_time, category, user_id)
+    VALUES (?, ?, ?, ?, ?)
+    `,
+    [title, prepTime, cookTime, category, userId],
+  );
+
+  return result.insertId;
+};
+
+const insertIngrendientIfNoExists = async (ingredientName: string) => {
+  const [rows] = await db.query<Rows>(
+    `
+    SELECT id
+    FROM ingredients
+    WHERE name = ?
+    `,
+    [ingredientName],
+  );
+
+  if (rows.length === 0) {
+    await db.query<Result>(
+      `
+      INSERT INTO ingredients (name)
+      VALUES (?)
+      `,
+      [ingredientName],
+    );
+  }
+};
+
+const getIngredientByName = async (ingredientName: string) => {
+  const [rows] = await db.query<Rows>(
+    `
+    SELECT id
+    FROM ingredients
+    WHERE name = ?
+    `,
+    [ingredientName],
+  );
+
+  return rows[0].id;
+};
+
+const addIngredientToRecipe = async (recipeId: number, ingredientId: number, quantity: number, unit: string) => {
+  await db.query<Result>(
+    `
+    INSERT INTO recipe_ingredients (recipe_id, ingredient_id, quantity, unit)
+    VALUES (?, ?, ?, ?)
+    `,
+    [recipeId, ingredientId, quantity, unit],
+  );
+};
+
+const addStepToRecipe = async (recipeId: number, stepNumber: number, description: string) => {
+  await db.query<Result>(
+    `
+    INSERT INTO steps (recipe_id, step_number, description)
+    VALUES (?, ?, ?)
+    `,
+    [recipeId, stepNumber, description],
+  );
+};
+
+export default { readAll, read, updateRecipe, updateIngredients, updateSteps, createRecipe, insertIngrendientIfNoExists, getIngredientByName, addIngredientToRecipe, addStepToRecipe };

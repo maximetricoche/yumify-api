@@ -62,4 +62,24 @@ const updateRecipe = async (
   }
 };
 
-export default { getAllRecipes, getRecipe, updateRecipe };
+const addRecipe = async (newRecipe: { title: string; prepTime: number; cookTime: number; category: string; userId: number }) => {
+  return await recipeModel.createRecipe(newRecipe);
+};
+
+const addIngredients = async (recipeId: number, ingredients: { name: string; quantity: number; unit: string }[]) => {
+  for (const ingredient of ingredients) {
+    await recipeModel.insertIngrendientIfNoExists(ingredient.name);
+
+    const ingredientId = await recipeModel.getIngredientByName(ingredient.name);
+
+    await recipeModel.addIngredientToRecipe(recipeId, ingredientId, ingredient.quantity, ingredient.unit);
+  }
+};
+
+const addSteps = async (recipeId: number, steps: { stepNumber: number; description: string }[]) => {
+  for (const step of steps) {
+    await recipeModel.addStepToRecipe(recipeId, step.stepNumber, step.description);
+  }
+};
+
+export default { getAllRecipes, getRecipe, updateRecipe, addRecipe, addIngredients, addSteps };
