@@ -1,5 +1,5 @@
 import db from "../configs/database";
-import type { Rows } from "../configs/database";
+import type { Rows, Result } from "../configs/database";
 
 const readAll = async (userId: number) => {
   const [rows] = await db.query<Rows>(
@@ -55,7 +55,7 @@ const read = async (recipeId: number, userId: number) => {
     cookTime: recipeData[0].cook_time,
     category: recipeData[0].category,
     image: recipeData[0].file_path,
-    ingredients: [] as { name: string; quantity: number; unit: string }[],
+    ingredients: [] as { id: number; name: string; quantity: number; unit: string }[],
     steps: [] as { stepNumber: number; description: string }[],
   };
 
@@ -63,6 +63,7 @@ const read = async (recipeId: number, userId: number) => {
     `
     SELECT
       ing.name,
+      ing.id,
       ri.quantity,
       ri.unit
     FROM recipe_ingredients ri
@@ -75,6 +76,7 @@ const read = async (recipeId: number, userId: number) => {
 
   ingredientsData.forEach((ingredient) => {
     recipe.ingredients.push({
+      id: ingredient.id,
       name: ingredient.name,
       quantity: ingredient.quantity,
       unit: ingredient.unit,
@@ -102,4 +104,73 @@ const read = async (recipeId: number, userId: number) => {
   return [recipe];
 };
 
-export default { readAll, read };
+const updateRecipe = async (recipeId: number, updatedData: { title: string; prepTime: number; cookTime: number; category: string }) => {
+  const { title, prepTime, cookTime, category } = updatedData;
+
+  const [result] = await db.query<Result>(
+    `
+    UPDATE recipes
+    SET title = ?, prep_time = ?, cook_time = ?, category = ?
+    WHERE id = ?
+    `,
+    [title, prepTime, cookTime, category, recipeId],
+  );
+
+  return result.affectedRows;
+};
+
+const updateIngredients = async (recipeId: number, updatedIngredients: { id: number; name: string; quantity: number; unit: string }[]) => {
+  let affectedRows = 0;
+
+  for (const ingredient of updatedIngredients) {
+    const { id, name, quantity, unit } = ingredient;
+
+    const [ingredientUpdateResult] = await db.query<Result>(
+      `
+      UPDATE ingredients
+      SET name = ?
+      WHERE id = ?
+      `,
+      [name, id],
+    );
+
+    if (ingredientUpdateResult.affectedRows > 0) {
+      affectedRows += ingredientUpdateResult.affectedRows;
+    }
+
+    const [result] = await db.query<Result>(
+      `
+        UPDATE recipe_ingredients
+        SET quantity = ?, unit = ?
+        WHERE recipe_id = ? AND ingredient_id = ?
+        `,
+      [quantity, unit, recipeId, id],
+    );
+
+    if (result.affectedRows > 0) {
+      affectedRows += result.affectedRows;
+    } else {
+      console.log(`No update for ingredient ${id} `);
+    }
+  }
+  return affectedRows;
+};
+
+const updateSteps = async (recipeId: number, updatedSteps: { stepNumber: number; description: string }[]) => {
+  for (const step of updatedSteps) {
+    const { stepNumber, description } = step;
+
+    const [result] = await db.query<Result>(
+      `
+      UPDATE steps
+      SET description = ?
+      WHERE recipe_id = ? AND step_number = ?
+      `,
+      [description, recipeId, stepNumber],
+    );
+
+    return result.affectedRows;
+  }
+};
+
+export default { readAll, read, updateRecipe, updateIngredients, updateSteps };
