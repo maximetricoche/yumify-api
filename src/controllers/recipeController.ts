@@ -19,4 +19,21 @@ const browse: RequestHandler = async (req, res, next) => {
   }
 };
 
-export default { browse };
+const read: RequestHandler = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { userId } = req.body;
+
+    const recipe = await recipeService.getRecipe(Number(id), Number(userId));
+
+    if (!recipe || recipe.length === 0) {
+      res.status(STATUS.NOT_FOUND).json({ message: "Recette introuvable" });
+      return;
+    }
+    res.status(STATUS.OK).json(recipe);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export default { browse, read };

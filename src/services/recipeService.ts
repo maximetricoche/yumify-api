@@ -11,4 +11,15 @@ const getAllRecipes = async (userId: number) => {
   }
 };
 
-export default { getAllRecipes };
+const getRecipe = async (recipeId: number, userId: number) => {
+  try {
+    const recipe = await recipeModel.read(recipeId, userId);
+
+    return recipe;
+  } catch (error) {
+    console.error("Erreur lors de la récupération de la recette", error);
+    throw error;
+  }
+};
+
+export default { getAllRecipes, getRecipe };
