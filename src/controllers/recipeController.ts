@@ -54,4 +54,25 @@ const edit: RequestHandler = async (req, res, next) => {
   }
 };
 
-export default { browse, read, edit };
+const add: RequestHandler = async (req, res, next) => {
+  try {
+    const { title, prepTime, cookTime, category, ingredients, steps, userId } = req.body;
+
+    if (!title || !prepTime || !cookTime || !category || !ingredients || !steps || !userId) {
+      res.status(STATUS.BAD_REQUEST).json({ message: "Données manquantes" });
+      return;
+    }
+
+    const newRecipeId = await recipeService.addRecipe({ title, prepTime, cookTime, category, userId });
+
+    await recipeService.addIngredients(newRecipeId, ingredients);
+
+    await recipeService.addSteps(newRecipeId, steps);
+
+    res.status(STATUS.CREATED).json({ message: "Recette ajoutée", newRecipeId });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export default { browse, read, edit, add };
