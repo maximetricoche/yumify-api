@@ -27,7 +27,8 @@ CREATE TABLE steps (
   step_number INT UNSIGNED NOT NULL,
   description TEXT NOT NULL,
   recipe_id INT UNSIGNED NOT NULL,
-  CONSTRAINT fk_recipe_step FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
+  CONSTRAINT fk_recipe_step FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE,
+  CONSTRAINT unique_step_number UNIQUE (step_number, recipe_id)
 );
 
 CREATE TABLE ingredients (
@@ -50,16 +51,16 @@ VALUES ("toto@toto.com", "toto");
 
 INSERT INTO images (file_path, file_name)
 VALUES 
-("uploads/recette1", "recette1.jpg"),
-("uploads/recette2", "recette2.jpg"),
-("uploads/recette3", "recette3.jpg"),
-("uploads/recette4", "recette4.jpg"),
-("uploads/recette5", "recette5.jpg"),
-("uploads/recette6", "recette6.jpg"),
-("uploads/recette7", "recette7.jpg"),
-("uploads/recette8", "recette8.jpg"),
-("uploads/recette9", "recette9.jpg"),
-("uploads/recette10", "recette10.jpg");
+("https://picsum.photos/seed/1234/500/350.webp", "recette1.jpg"),
+("https://picsum.photos/seed/5678/500/350.webp", "recette2.jpg"),
+("https://picsum.photos/seed/3333/500/350.webp", "recette3.jpg"),
+("https://picsum.photos/seed/9101/500/350.webp", "recette4.jpg"),
+("https://picsum.photos/seed/1121/500/350.webp", "recette5.jpg"),
+("https://picsum.photos/seed/3141/500/350.webp", "recette6.jpg"),
+("https://picsum.photos/seed/5161/500/350.webp", "recette7.jpg"),
+("https://picsum.photos/seed/7181/500/350.webp", "recette8.jpg"),
+("https://picsum.photos/seed/9202/500/350.webp", "recette9.jpg"),
+("https://picsum.photos/seed/2222/500/350.webp", "recette10.jpg");
 
 INSERT INTO recipes (title, prep_time, cook_time, category, user_id, image_id)
 VALUES
