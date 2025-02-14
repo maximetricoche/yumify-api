@@ -11,10 +11,10 @@ const db = mysql.createPool({
 
 export default db;
 
-import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { Pool, ResultSetHeader, RowDataPacket, Connection } from "mysql2/promise";
 
-type DatabaseClient = Pool;
+type ConnectionDB = Connection;
 type Result = ResultSetHeader;
 type Rows = RowDataPacket[];
 
-export type { DatabaseClient, Result, Rows };
+export type { ConnectionDB, Result, Rows };

@@ -1,96 +1,97 @@
+import type { ConnectionDB } from "../configs/database";
+import { createError } from "../middlewares/errorHandler";
 import recipeModel from "../models/recipeModel";
+import { RecipeDTO, RecipeSummaryDTO } from "../types/recipe.dto";
+import { handleError } from "../utils/errorUtils";
+import { STATUS } from "../utils/httpStatus";
 
-const getAllRecipes = async (userId: number) => {
+const getAllRecipes = async (userId: number): Promise<RecipeSummaryDTO[]> => {
   try {
     const recipes = await recipeModel.readAll(userId);
 
+    if (!recipes || recipes.length === 0) {
+      throw createError(STATUS.NOT_FOUND, "Aucune recette trouvée");
+    }
+
     return recipes;
   } catch (error) {
-    console.error("Erreur lors de la récupération des recettes", error);
-    throw error;
+    throw handleError(error, "Erreur lors de la récupération de toutes les recettes");
   }
 };
 
-const getRecipe = async (recipeId: number, userId: number) => {
+const getRecipe = async (recipeId: number, userId: number): Promise<RecipeDTO> => {
   try {
     const recipe = await recipeModel.read(recipeId, userId);
 
+    if (!recipe) {
+      throw createError(STATUS.NOT_FOUND, "Recette introuvable");
+    }
+
     return recipe;
   } catch (error) {
-    console.error("Erreur lors de la récupération de la recette", error);
-    throw error;
+    throw handleError(error, "Erreur lors de la récupération de la recette");
   }
 };
 
-const updateRecipe = async (
-  recipeId: number,
-  updatedData: {
-    title: string;
-    prepTime: number;
-    cookTime: number;
-    category: string;
-    ingredients: { id: number; name: string; quantity: number; unit: string }[];
-    steps: { stepNumber: number; description: string }[];
-  },
-) => {
-  const modifications = {
-    recipeUpdated: false,
-    ingredientsUpdated: false,
-    stepsUpdated: false,
-  };
-
+const updateRecipe = async (connection: ConnectionDB, recipeId: number, updatedData: RecipeDTO): Promise<void> => {
   try {
-    const recipeResult = await recipeModel.updateRecipe(recipeId, updatedData);
-    if (recipeResult > 0) {
-      modifications.recipeUpdated = true;
+    await connection.beginTransaction();
+
+    const recipeResult = await recipeModel.updateRecipe(connection, recipeId, updatedData);
+
+    if (recipeResult.affectedRows === 0) {
+      throw createError(STATUS.NOT_FOUND, "Recette introuvable");
     }
 
-    const ingredientsResult = await recipeModel.updateIngredients(recipeId, updatedData.ingredients);
-    if (ingredientsResult && ingredientsResult > 0) {
-      modifications.ingredientsUpdated = true;
+    const ingredientsResult = await recipeModel.updateIngredients(connection, recipeId, updatedData.ingredients);
+
+    if (ingredientsResult.affectedRows === 0) {
+      throw createError(STATUS.NOT_FOUND, "Ingrédients introuvables");
     }
 
-    const stepsResult = await recipeModel.updateSteps(recipeId, updatedData.steps);
-    if (stepsResult && stepsResult > 0) {
-      modifications.stepsUpdated = true;
+    const stepsResult = await recipeModel.updateSteps(connection, recipeId, updatedData.steps);
+
+    if (stepsResult.affectedRows === 0) {
+      throw createError(STATUS.NOT_FOUND, "Étapes introuvables");
     }
 
-    return modifications;
+    await connection.commit();
   } catch (error) {
-    console.error("Erreur lors de la mise à jour de la recette", error);
-    throw error;
+    await connection.rollback();
+    throw handleError(error, "Erreur lors de la mise à jour de la recette");
   }
 };
 
-const addRecipe = async (newRecipe: { title: string; prepTime: number; cookTime: number; category: string; userId: number }) => {
-  return await recipeModel.createRecipe(newRecipe);
-};
+const addRecipe = async (connection: ConnectionDB, newRecipe: RecipeDTO): Promise<number> => {
+  try {
+    await connection.beginTransaction();
 
-const addIngredients = async (recipeId: number, ingredients: { name: string; quantity: number; unit: string }[]) => {
-  for (const ingredient of ingredients) {
-    await recipeModel.insertIngrendientIfNoExists(ingredient.name);
+    const newRecipeId = await recipeModel.createRecipe(connection, newRecipe);
 
-    const ingredientId = await recipeModel.getIngredientByName(ingredient.name);
+    await recipeModel.addIngredients(connection, newRecipeId, newRecipe.ingredients);
+    await recipeModel.addSteps(connection, newRecipeId, newRecipe.steps);
 
-    await recipeModel.addIngredientToRecipe(recipeId, ingredientId, ingredient.quantity, ingredient.unit);
+    await connection.commit();
+    return newRecipeId;
+  } catch (error) {
+    await connection.rollback();
+    throw handleError(error, "Erreur lors de l'ajout de la recette");
   }
 };
 
-const addSteps = async (recipeId: number, steps: { stepNumber: number; description: string }[]) => {
-  for (const step of steps) {
-    await recipeModel.addStepToRecipe(recipeId, step.stepNumber, step.description);
-  }
-};
-
-const deleteRecipe = async (recipeId: number) => {
+const deleteRecipe = async (recipeId: number): Promise<any> => {
   try {
     const result = await recipeModel.deleteRecipe(recipeId);
+    console.log(result);
+
+    if (!result || result.affectedRows === 0) {
+      throw createError(STATUS.NOT_FOUND, "Recette introuvable");
+    }
 
     return result;
   } catch (error) {
-    console.error("Erreur lors de la suppression de la recette", error);
-    throw error;
+    throw handleError(error, "Erreur lors de la suppression de la recette");
   }
 };
 
-export default { getAllRecipes, getRecipe, updateRecipe, addRecipe, addIngredients, addSteps, deleteRecipe };
+export default { getAllRecipes, getRecipe, updateRecipe, addRecipe, deleteRecipe };

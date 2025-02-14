@@ -1,113 +1,110 @@
-import db from "../configs/database";
-import type { Rows, Result } from "../configs/database";
+import type { ConnectionDB, Result, Rows } from "../configs/database";
+import { IngredientDTO, RecipeDTO, RecipeSummaryDTO, StepDTO } from "../types/recipe.dto";
 
-const readAll = async (userId: number) => {
+import db from "../configs/database";
+
+const readAll = async (userId: number): Promise<RecipeSummaryDTO[]> => {
+  const [rows] = await db.query<Rows>(
+    `
+        SELECT
+          recipes.id,
+          title, 
+          prep_time AS prepTime, 
+          cook_time AS cookTime,
+          category,
+          images.file_path AS image
+        FROM recipes
+        LEFT JOIN images
+          ON recipes.image_id = images.id
+        WHERE user_id = ?
+        `,
+    [userId],
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    prepTime: row.prepTime,
+    cookTime: row.cookTime,
+    category: row.category,
+    image: row.image,
+  }));
+};
+
+const read = async (recipeId: number, userId: number): Promise<RecipeDTO> => {
   const [rows] = await db.query<Rows>(
     `
       SELECT
         recipes.id,
-        title, 
-        prep_time, 
-        cook_time,
+        title,
+        prep_time AS prepTime,
+        cook_time AS cookTime,
         category,
-        images.file_path
+        images.file_path AS image
       FROM recipes
-      LEFT JOIN images
+      LEFT JOIN images    
         ON recipes.image_id = images.id
-      WHERE user_id = ?
+      WHERE recipes.id = ? AND recipes.user_id = ?
       `,
-    [userId],
-  );
-
-  const recipes = {
-    id: rows[0].id,
-    title: rows[0].title,
-    prepTime: rows[0].prep_time,
-    cookTime: rows[0].cook_time,
-    category: rows[0].category,
-    image: rows[0].file_path,
-  };
-
-  return [recipes];
-};
-
-const read = async (recipeId: number, userId: number) => {
-  const [recipeData] = await db.query<Rows>(
-    `
-    SELECT
-      recipes.id,
-      title,
-      prep_time,
-      cook_time,
-      category,
-      images.file_path
-    FROM recipes
-    LEFT JOIN images    
-      ON recipes.image_id = images.id
-    WHERE recipes.id = ? AND recipes.user_id = ?
-    `,
     [recipeId, userId],
   );
-  const recipe = {
-    id: recipeData[0].id,
-    title: recipeData[0].title,
-    prepTime: recipeData[0].prep_time,
-    cookTime: recipeData[0].cook_time,
-    category: recipeData[0].category,
-    image: recipeData[0].file_path,
-    ingredients: [] as { id: number; name: string; quantity: number; unit: string }[],
-    steps: [] as { stepNumber: number; description: string }[],
+
+  const recipe: RecipeDTO = {
+    id: rows[0].id,
+    title: rows[0].title,
+    prepTime: rows[0].prepTime,
+    cookTime: rows[0].cookTime,
+    category: rows[0].category,
+    image: rows[0].image,
+    ingredients: [],
+    steps: [],
   };
 
-  const [ingredientsData] = await db.query<Rows>(
+  const [ingredients] = await db.query<Rows>(
     `
-    SELECT
-      ing.name,
-      ing.id,
-      ri.quantity,
-      ri.unit
-    FROM recipe_ingredients ri
-    JOIN ingredients ing
-      ON ri.ingredient_id = ing.id
-    WHERE ri.recipe_id = ?
-    `,
+      SELECT 
+        ing.name,
+        ing.id,
+        ri.quantity,
+        ri.unit
+      FROM recipe_ingredients ri
+      JOIN ingredients ing
+        ON ri.ingredient_id = ing.id
+      WHERE ri.recipe_id = ?
+      `,
     [recipeId],
   );
 
-  ingredientsData.forEach((ingredient) => {
-    recipe.ingredients.push({
-      id: ingredient.id,
-      name: ingredient.name,
-      quantity: ingredient.quantity,
-      unit: ingredient.unit,
-    });
-  });
+  recipe.ingredients = ingredients.map((ingredient) => ({
+    id: ingredient.id,
+    name: ingredient.name,
+    quantity: ingredient.quantity,
+    unit: ingredient.unit,
+  }));
 
-  const [stepsData] = await db.query<Rows>(
+  const [steps] = await db.query<Rows>(
     `
-    SELECT
-      step_number,
-      description
-    FROM steps
-    WHERE recipe_id = ?
-    `,
+      SELECT
+        step_number AS stepNumber,
+        description
+      FROM steps
+      WHERE recipe_id = ?
+      `,
     [recipeId],
   );
 
-  stepsData.forEach((step) => {
-    recipe.steps.push({
-      stepNumber: step.step_number,
-      description: step.description,
-    });
-  });
+  recipe.steps = steps.map((step) => ({
+    stepNumber: step.stepNumber,
+    description: step.description,
+  }));
 
-  return [recipe];
+  return recipe;
 };
 
-const updateRecipe = async (recipeId: number, updatedData: { title: string; prepTime: number; cookTime: number; category: string }) => {
+const updateRecipe = async (connection: ConnectionDB, recipeId: number, updatedData: RecipeDTO): Promise<Result> => {
   const { title, prepTime, cookTime, category } = updatedData;
 
-  const [result] = await db.query<Result>(
+  const [result] = await connection.execute<Result>(
     `
     UPDATE recipes
     SET title = ?, prep_time = ?, cook_time = ?, category = ?
@@ -116,128 +113,121 @@ const updateRecipe = async (recipeId: number, updatedData: { title: string; prep
     [title, prepTime, cookTime, category, recipeId],
   );
 
-  return result.affectedRows;
+  return result;
 };
 
-const updateIngredients = async (recipeId: number, updatedIngredients: { id: number; name: string; quantity: number; unit: string }[]) => {
-  let affectedRows = 0;
-
-  for (const ingredient of updatedIngredients) {
-    const { id, name, quantity, unit } = ingredient;
-
-    const [ingredientUpdateResult] = await db.query<Result>(
-      `
-      UPDATE ingredients
-      SET name = ?
-      WHERE id = ?
-      `,
-      [name, id],
-    );
-
-    if (ingredientUpdateResult.affectedRows > 0) {
-      affectedRows += ingredientUpdateResult.affectedRows;
-    }
-
-    const [result] = await db.query<Result>(
-      `
+const updateIngredients = async (connection: ConnectionDB, recipeId: number, updatedIngredients: IngredientDTO[]): Promise<{ affectedRows: number }> => {
+  const updateResults = await Promise.all(
+    updatedIngredients.map(({ id, name, quantity, unit }) =>
+      Promise.all([
+        connection.execute<Result>(
+          `
+        UPDATE ingredients
+        SET name = ?
+        WHERE id = ?
+        `,
+          [name, id],
+        ),
+        connection.execute<Result>(
+          `
         UPDATE recipe_ingredients
         SET quantity = ?, unit = ?
         WHERE recipe_id = ? AND ingredient_id = ?
         `,
-      [quantity, unit, recipeId, id],
-    );
+          [quantity, unit, recipeId, id],
+        ),
+      ]),
+    ),
+  );
 
-    if (result.affectedRows > 0) {
-      affectedRows += result.affectedRows;
-    } else {
-      console.log(`No update for ingredient ${id} `);
-    }
-  }
-  return affectedRows;
+  let affectedRows = 0;
+  updateResults.forEach(([ingredientUpdateResult, recipeIngredientUpdateResult]) => {
+    affectedRows += ingredientUpdateResult[0].affectedRows > 0 ? 1 : 0;
+    affectedRows += recipeIngredientUpdateResult[0].affectedRows > 0 ? 1 : 0;
+  });
+
+  return { affectedRows };
 };
 
-const updateSteps = async (recipeId: number, updatedSteps: { stepNumber: number; description: string }[]) => {
-  for (const step of updatedSteps) {
-    const { stepNumber, description } = step;
+const updateSteps = async (connection: ConnectionDB, recipeId: number, updatedSteps: StepDTO[]): Promise<{ affectedRows: number }> => {
+  const updateResults = await Promise.all(
+    updatedSteps.map(({ stepNumber, description }) =>
+      connection.execute<Result>(
+        `
+        UPDATE steps
+        SET description = ?
+        WHERE recipe_id = ? AND step_number = ?
+        `,
+        [description, recipeId, stepNumber],
+      ),
+    ),
+  );
 
-    const [result] = await db.query<Result>(
-      `
-      UPDATE steps
-      SET description = ?
-      WHERE recipe_id = ? AND step_number = ?
-      `,
-      [description, recipeId, stepNumber],
-    );
-
-    return result.affectedRows;
-  }
+  const affectedRows = updateResults.filter(([result]) => result.affectedRows > 0).length;
+  return { affectedRows };
 };
 
-const createRecipe = async (newRecipe: { title: string; prepTime: number; cookTime: number; category: string; userId: number }) => {
+const createRecipe = async (connection: ConnectionDB, newRecipe: RecipeDTO) => {
   const { title, prepTime, cookTime, category, userId } = newRecipe;
 
-  const [result] = await db.query<Result>(
+  // FIXME: This should be moved to a service
+  // Generate a random seed to get a random image from the Picsum API
+  const randomSeed = Math.floor(Math.random() * 1000);
+  const imageUrl = `https://picsum.photos/seed/${randomSeed}/500/350`;
+
+  const [result] = await connection.execute<Result>(
     `
-    INSERT INTO recipes (title, prep_time, cook_time, category, user_id)
+    INSERT INTO recipes (title, prep_time, cook_time, category, user_id, image_id)
     VALUES (?, ?, ?, ?, ?)
     `,
-    [title, prepTime, cookTime, category, userId],
+    [title, prepTime, cookTime, category, userId, imageUrl],
   );
 
   return result.insertId;
 };
 
-const insertIngrendientIfNoExists = async (ingredientName: string) => {
-  const [rows] = await db.query<Rows>(
-    `
-    SELECT id
-    FROM ingredients
-    WHERE name = ?
-    `,
-    [ingredientName],
-  );
-
-  if (rows.length === 0) {
-    await db.query<Result>(
+const addIngredients = async (connection: ConnectionDB, newRecipeId: number, ingredients: IngredientDTO[]) => {
+  for (const ingredient of ingredients) {
+    await connection.execute<Result>(
       `
-      INSERT INTO ingredients (name)
-      VALUES (?)
-      `,
-      [ingredientName],
+          INSERT IGNORE INTO ingredients (name)
+          VALUES (?)
+          `,
+      [ingredient.name],
+    );
+
+    const [rows] = await connection.execute<Rows>(
+      `
+          SELECT id
+          FROM ingredients
+          WHERE name = ? 
+          `,
+      [ingredient.name],
+    );
+
+    const ingredientId = rows[0].id;
+
+    await connection.execute(
+      `
+            INSERT INTO recipe_ingredients (recipe_id, ingredient_id, quantity, unit)
+            VALUES (?, ?, ?, ?)
+            `,
+      [newRecipeId, ingredientId, ingredient.quantity, ingredient.unit],
     );
   }
 };
 
-const getIngredientByName = async (ingredientName: string) => {
-  const [rows] = await db.query<Rows>(
-    `
-    SELECT id
-    FROM ingredients
-    WHERE name = ?
-    `,
-    [ingredientName],
-  );
-
-  return rows[0].id;
-};
-
-const addIngredientToRecipe = async (recipeId: number, ingredientId: number, quantity: number, unit: string) => {
-  await db.query<Result>(
-    `
-    INSERT INTO recipe_ingredients (recipe_id, ingredient_id, quantity, unit)
-    VALUES (?, ?, ?, ?)
-    `,
-    [recipeId, ingredientId, quantity, unit],
-  );
-};
-
-const addStepToRecipe = async (recipeId: number, stepNumber: number, description: string) => {
-  await db.query<Result>(
-    `
-    INSERT INTO steps (recipe_id, step_number, description)
-    VALUES (?, ?, ?)
-    `,
-    [recipeId, stepNumber, description],
+const addSteps = async (connection: ConnectionDB, recipeId: number, steps: StepDTO[]) => {
+  await Promise.all(
+    steps.map(({ stepNumber, description }) =>
+      connection.execute<Result>(
+        `
+        INSERT INTO steps (recipe_id, step_number, description)
+        VALUES (?, ?, ?)
+        `,
+        [recipeId, stepNumber, description],
+      ),
+    ),
   );
 };
 
@@ -249,7 +239,7 @@ const deleteRecipe = async (recipeId: number) => {
     `,
     [recipeId],
   );
-  return result.affectedRows;
+  return result;
 };
 
-export default { readAll, read, updateRecipe, updateIngredients, updateSteps, createRecipe, insertIngrendientIfNoExists, getIngredientByName, addIngredientToRecipe, addStepToRecipe, deleteRecipe };
+export default { readAll, read, updateRecipe, updateIngredients, updateSteps, createRecipe, addIngredients, addSteps, deleteRecipe };
