@@ -84,9 +84,9 @@ const destroy: RequestHandler = async (req, res, next) => {
       throw createError(STATUS.BAD_REQUEST, "ID de la recette manquant");
     }
 
-    const result = await recipeService.deleteRecipe(recipeId);
+    await recipeService.deleteRecipe(recipeId);
 
-    res.status(STATUS.OK).json({ message: "Recette supprimée", result });
+    res.status(STATUS.OK).json({ message: "Recette supprimée" });
   } catch (error) {
     next(error);
   }
