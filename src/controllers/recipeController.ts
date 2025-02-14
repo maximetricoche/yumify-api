@@ -1,18 +1,21 @@
 import { RequestHandler } from "express";
+import { createError } from "../middlewares/errorHandler";
+import { RecipeDTO, RecipeSummaryDTO } from "../types/recipe.dto";
 import { STATUS } from "../utils/httpStatus";
 
+import db from "../configs/database";
 import recipeService from "../services/recipeService";
 
 const browse: RequestHandler = async (req, res, next) => {
   try {
-    const { userId } = req.body;
+    const userId = Number.parseInt(req.body.userId);
 
-    const recipes = await recipeService.getAllRecipes(Number(userId));
-
-    if (!recipes || recipes.length === 0) {
-      res.status(STATUS.NOT_FOUND).json({ message: "Aucune recette trouvée" });
-      return;
+    if (!userId) {
+      return next(createError(STATUS.BAD_REQUEST, "L'ID de l'utilisateur est manquant"));
     }
+
+    const recipes: RecipeSummaryDTO[] = await recipeService.getAllRecipes(userId);
+
     res.status(STATUS.OK).json(recipes);
   } catch (error) {
     next(error);
@@ -21,15 +24,15 @@ const browse: RequestHandler = async (req, res, next) => {
 
 const read: RequestHandler = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const { userId } = req.body;
+    const recipeId = Number.parseInt(req.params.id);
+    const userId = Number.parseInt(req.body.userId);
 
-    const recipe = await recipeService.getRecipe(Number(id), Number(userId));
-
-    if (!recipe || recipe.length === 0) {
-      res.status(STATUS.NOT_FOUND).json({ message: "Recette introuvable" });
-      return;
+    if (!recipeId || !userId) {
+      return next(createError(STATUS.BAD_REQUEST, "L'ID de l'utilisateur ou de la recette sont requis"));
     }
+
+    const recipe: RecipeDTO = await recipeService.getRecipe(recipeId, userId);
+
     res.status(STATUS.OK).json(recipe);
   } catch (error) {
     next(error);
@@ -37,37 +40,35 @@ const read: RequestHandler = async (req, res, next) => {
 };
 
 const edit: RequestHandler = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { updatedData } = req.body;
+  const connection = await db.getConnection();
 
-    if (!id || !updatedData) {
-      res.status(STATUS.BAD_REQUEST).json({ message: "Données manquantes" });
-      return;
+  try {
+    const recipeId = Number.parseInt(req.params.id);
+    const updatedData = req.body;
+
+    if (!recipeId || !updatedData) {
+      return next(createError(STATUS.BAD_REQUEST, "ID de la recette ou données manquantes"));
     }
 
-    const modifications = await recipeService.updateRecipe(Number(id), updatedData);
-
-    res.status(STATUS.OK).json({ message: "Mise à jour effectuée", modifications });
+    const updatedRecipe = await recipeService.updateRecipe(connection, recipeId, updatedData);
+    // FIXME: Est ce qu'on renvoit vraiment la recette modifiée ?
+    res.status(STATUS.OK).json({ message: "Mise à jour effectuée", updatedRecipe });
   } catch (error) {
     next(error);
   }
 };
 
 const add: RequestHandler = async (req, res, next) => {
-  try {
-    const { title, prepTime, cookTime, category, ingredients, steps, userId } = req.body;
+  const connection = await db.getConnection();
 
-    if (!title || !prepTime || !cookTime || !category || !ingredients || !steps || !userId) {
-      res.status(STATUS.BAD_REQUEST).json({ message: "Données manquantes" });
-      return;
+  try {
+    const newRecipe: RecipeDTO = req.body;
+
+    if (!newRecipe.title || !newRecipe.prepTime || !newRecipe.cookTime || !newRecipe.category || !newRecipe.ingredients || !newRecipe.steps || !newRecipe.userId) {
+      return next(createError(STATUS.BAD_REQUEST, "Données manquantes"));
     }
 
-    const newRecipeId = await recipeService.addRecipe({ title, prepTime, cookTime, category, userId });
-
-    await recipeService.addIngredients(newRecipeId, ingredients);
-
-    await recipeService.addSteps(newRecipeId, steps);
+    const newRecipeId = await recipeService.addRecipe(connection, newRecipe);
 
     res.status(STATUS.CREATED).json({ message: "Recette ajoutée", newRecipeId });
   } catch (error) {
@@ -77,19 +78,13 @@ const add: RequestHandler = async (req, res, next) => {
 
 const destroy: RequestHandler = async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const recipeId = Number.parseInt(req.params.id);
 
-    if (!id) {
-      res.status(STATUS.BAD_REQUEST).json({ message: "Données manquantes" });
-      return;
+    if (!recipeId) {
+      throw createError(STATUS.BAD_REQUEST, "ID de la recette manquant");
     }
 
-    const result = await recipeService.deleteRecipe(Number(id));
-
-    if (!result || result === 0) {
-      res.status(STATUS.NOT_FOUND).json({ message: "Recette introuvable" });
-      return;
-    }
+    const result = await recipeService.deleteRecipe(recipeId);
 
     res.status(STATUS.OK).json({ message: "Recette supprimée", result });
   } catch (error) {
